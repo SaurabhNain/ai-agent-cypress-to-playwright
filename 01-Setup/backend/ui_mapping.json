@@ -1,0 +1,31 @@
+{
+  "color_map": {
+    "Primary": "#005ca9",
+    "Secondary": "#003366",
+    "White": "#FFFFFF",
+    "Transparent": "rgba(0,0,0,0)",
+    "Gray": "#F9F9F9",
+    "Black": "#000000",
+    "Error": "#FF0000",
+    "Accent": "#D4F0FA"
+  },
+  "fonts": {
+    "default": "system-ui",
+    "size": "11pt",
+    "captionSize": "11pt",
+    "inputSize": "10pt",
+    "labelWeight": "bold",
+    "captionWeight": "bold"
+  },
+  "alignment": {
+    "label": "left",
+    "caption": "left",
+    "input": "center",
+    "slider": "horizontal"
+  },
+  "slider": {
+    "thumbWidth": "16px",
+    "thumbHeight": "16px",
+    "trackHeight": "8px"
+  }
+}

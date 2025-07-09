@@ -1,0 +1,55 @@
+# ---- Python (FastAPI) ----
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.env
+.venv/
+venv/
+Pipfile
+Pipfile.lock
+poetry.lock
+
+# Logs & Database
+logs/
+*.log
+db.sqlite3
+instance/
+
+# Compiled files
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# VS Code settings
+.vscode/
+
+# ---- Node.js (React) ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+package-lock.json
+.dockerignore
+
+# React build
+build/
+dist/
+.cache/
+*.env.local
+.env.production
+.env.development
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+
+# ---- Docker ----
+docker-compose.override.yml
