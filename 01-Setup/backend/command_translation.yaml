@@ -1,0 +1,8 @@
+# command_translation.yaml
+# Basic prompt to translate Cypress command to Playwright
+
+description: "Translate Cypress code to Playwright equivalent"
+template: |
+  // Convert the following Cypress test snippet to Playwright:
+  {{CODE_SNIPPET}}
+  // Ensure usage of 'await', 'page.locator', and 'expect'

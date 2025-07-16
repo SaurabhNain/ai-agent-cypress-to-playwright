@@ -1,188 +1,148 @@
-"""
-main.py
-~~~~~~~
-Generic Code Transformation Agent
-
-• Reuses cached transformations using Chroma before LLM
-• Batches unknown components → 1 executor + 1 validator call
-• Final regrouping via LLM prompt
-"""
-
-from __future__ import annotations
-
-import json
-import logging
-import os
-import re
-import uuid
-from contextlib import contextmanager
-from typing import Dict, List, Optional, Tuple, Any
-
-import yaml
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Response, WebSocket
+from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from groq import Groq
 
-from dspy.pydantic_models import ConversionRequest, ConversionResponse
-from rag.knowledge_base import RAGKnowledgeBase
+from agents.pydantic_models import (
+    ConversionRequest, ConversionResponse,
+    ComponentResult, ValidationResult, ValidationIssue, ValidationFix
+)
+from agents.dspy_implementation import setup_dspy_pipeline
 
-# ────────────────────────────────────────────────────────────────
-# Config & logging
-# ────────────────────────────────────────────────────────────────
-load_dotenv()
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("code-transform-agent")
-
-MODEL = "llama3-70b-8192"
-SIMILARITY_THRESHOLD = 1.0
-
-llm_call_counter = 0
-active_connections: Dict[str, WebSocket] = {}
-IN_MEMORY_CACHE = {}
+import logging
+import traceback
+import time
+import json
+from typing import Dict, Any, List
 
 # ────────────────────────────────────────────────────────────────
-# Helpers
+# App Setup
 # ────────────────────────────────────────────────────────────────
-def safe_json_loads(json_str: str, default_value=None):
-    try:
-        return json.loads(json_str)
-    except json.JSONDecodeError as e:
-        log.error(f"Failed to parse JSON: {e}")
-        return default_value
+app = FastAPI(
+    title="AI Code Transformation Agent",
+    description="A DSPy-powered agent for converting source code to target framework using planner/executor/validator/regrouper",
+    version="1.0.0"
+)
 
-class AgentLogMessage:
-    def __init__(self, session_id, agent, status, message, cache_miss=None):
-        self.session_id = session_id
-        self.agent = agent
-        self.status = status
-        self.message = message
-        self.cache_miss = cache_miss
-
-    def to_dict(self):
-        result = {
-            "agent": self.agent,
-            "status": self.status,
-            "message": self.message,
-        }
-        if self.cache_miss is not None:
-            result["cacheMiss"] = self.cache_miss
-        return result
-
-# ────────────────────────────────────────────────────────────────
-# Prompts & Mapping
-# ────────────────────────────────────────────────────────────────
-def load_yaml(path: str) -> Dict:
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    except FileNotFoundError:
-        log.warning(f"{path} not found – using empty fallback")
-        return {}
-
-PROMPTS = load_yaml("prompts.yml")
-try:
-    with open("ui_mapping.json", "r", encoding="utf-8") as f:
-        UI_MAPPING = json.load(f)
-except FileNotFoundError:
-    UI_MAPPING = {}
-
-# ────────────────────────────────────────────────────────────────
-# Core: Vector DB + LLM Client
-# ────────────────────────────────────────────────────────────────
-kb = RAGKnowledgeBase()
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
-@contextmanager
-def track_llm_calls():
-    global llm_call_counter
-    llm_call_counter = 0
-    try:
-        yield
-    finally:
-        pass
-
-async def call_llm(system_prompt: str, user_prompt: str) -> str:
-    global llm_call_counter
-    llm_call_counter += 1
-    resp = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.1,
-        max_tokens=4000,
-    )
-    return resp.choices[0].message.content
-
-# ────────────────────────────────────────────────────────────────
-# FastAPI setup
-# ────────────────────────────────────────────────────────────────
-app = FastAPI(title="Generic Code Transformation Agent")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-LLM-Calls", "X-Session-ID", "Content-Type"]
+    expose_headers=["*"]
 )
 
-@app.websocket("/ws/conversion/{session_id}")
-async def conversion_websocket(websocket: WebSocket, session_id: str):
-    await websocket.accept()
-    active_connections[session_id] = websocket
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("agent-api")
+
+# ────────────────────────────────────────────────────────────────
+# DSPy Pipeline Setup
+# ────────────────────────────────────────────────────────────────
+pipeline = None
+
+def get_pipeline():
+    global pipeline
+    if pipeline is None:
+        pipeline = setup_dspy_pipeline()
+    return pipeline
+
+# ────────────────────────────────────────────────────────────────
+# Exception Handler
+# ────────────────────────────────────────────────────────────────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error("Exception occurred", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)}
+    )
+
+# ────────────────────────────────────────────────────────────────
+# Convert Endpoint
+# ────────────────────────────────────────────────────────────────
+@app.post(
+    "/convert",
+    response_model=ConversionResponse,
+    summary="Convert source code to target code using AI agents",
+    description="Processes input source code and returns converted output with validation and layout"
+)
+async def convert_code(
+    request: ConversionRequest,
+    pipeline = Depends(get_pipeline)
+):
     try:
-        while True:
-            data = await websocket.receive_text()
-            if data == "ping":
-                await websocket.send_json({"type": "pong", "message": "pong"})
+        start = time.time()
+        logger.info("Starting conversion pipeline...")
+
+        result = pipeline(request.input_code)
+
+        # Format results
+        formatted_components = []
+        for comp in result.get("components", []):
+            val_data = comp.get("validation", {})
+            validation = ValidationResult(
+                valid=val_data.get("valid", True),
+                issues=[
+                    ValidationIssue(**issue) if isinstance(issue, dict) else ValidationIssue(type="unknown", description=str(issue), severity="info")
+                    for issue in val_data.get("issues", [])
+                ],
+                fixes=[
+                    ValidationFix(**fix) if isinstance(fix, dict) else ValidationFix(issue_index=0, fix=str(fix))
+                    for fix in val_data.get("fixes", [])
+                ],
+                improved_code=val_data.get("improved_code")
+            )
+
+            formatted_components.append(
+                ComponentResult(
+                    type=comp.get("type", "unknown"),
+                    code=comp.get("code", "// No code generated"),
+                    validation=validation
+                )
+            )
+
+        duration = time.time() - start
+        logger.info(f"✅ Conversion completed in {duration:.2f}s")
+
+        return ConversionResponse(
+            converted_code=result.get("converted_code", "// No code generated"),
+            components=formatted_components,
+            metadata={"duration_seconds": duration}
+        )
+
     except Exception as e:
-        log.error(f"WebSocket error: {str(e)}")
-    finally:
-        if session_id in active_connections:
-            del active_connections[session_id]
-
-# ────────────────────────────────────────────────────────────────
-# Stub parser (replace this in specific agents)
-# ────────────────────────────────────────────────────────────────
-def parse_input_code(input_code: str) -> List[Dict]:
-    return []  # Placeholder
-
-# ────────────────────────────────────────────────────────────────
-# Main endpoint (to customize in agent)
-# ────────────────────────────────────────────────────────────────
-@app.post("/convert")
-async def convert_source_to_target(request: ConversionRequest, response: Response):
-    session_id = str(uuid.uuid4())
-    try:
-        with track_llm_calls():
-            await send_log(session_id, "Parser", "working", "Parsing input...")
-            parsed = parse_input_code(request.input_code)
-
-            await send_log(session_id, "Executor", "working", f"Identifying {len(parsed)} components")
-            # More logic here for cache split, LLM call, regroup...
-            # Placeholder return for now:
-            return {
-                "success": True,
-                "converted_code": "// Placeholder code",
-                "metadata": {"llm_calls": llm_call_counter, "session_id": session_id}
-            }
-    except Exception as e:
-        await send_log(session_id, "System", "error", str(e))
+        logger.error(f"Conversion failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-async def send_log(session_id, agent, status, message):
-    msg = AgentLogMessage(session_id, agent, status, message)
-    if session_id in active_connections:
-        try:
-            await active_connections[session_id].send_json(msg.to_dict())
-        except Exception as e:
-            log.error(f"WebSocket send error: {str(e)}")
+# ────────────────────────────────────────────────────────────────
+# UI Mapping (optional preview/debug)
+# ────────────────────────────────────────────────────────────────
+@app.get("/ui-mapping", response_model=Dict[str, Any])
+async def get_ui_mapping():
+    try:
+        with open("ui_mapping.json", "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {
+            "color_map": {},
+            "fonts": {},
+            "alignment": {},
+            "slider": {}
+        }
 
+# ────────────────────────────────────────────────────────────────
+# Health Check
+# ────────────────────────────────────────────────────────────────
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "model": MODEL, "kb_collection": kb.collection.name}
+    return {
+        "status": "healthy",
+        "pipeline": "initialized"
+    }
 
-
+# ────────────────────────────────────────────────────────────────
+# Root endpoint
+# ────────────────────────────────────────────────────────────────
+@app.get("/")
+async def root():
+    return {"message": "Cypress to Playwright Conversion API", "version": "1.0.0"}

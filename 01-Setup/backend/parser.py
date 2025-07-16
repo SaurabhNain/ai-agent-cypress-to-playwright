@@ -1,21 +1,29 @@
+# parser.py
+# Parses Cypress test files and returns AST + metadata using Babel via subprocess (Node.js required)
+
+import os
+import subprocess
 import json
-import logging
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-def parse_input_code(raw_code: str) -> str:
+def parse_cypress_directory(directory_path):
     """
-    Stub parser – to be implemented by specific agent modules (e.g., Cypress parser, XML parser, etc.)
-
-    This should convert raw input (source code) into a normalized JSON format:
-    {
-        "children": [
-            {
-                "children": [ ... list of parsed component dicts ... ]
-            }
-        ]
-    }
+    Invokes a Node.js script to parse Cypress test files into ASTs and extract metadata.
     """
-    logger.info("Generic parser called – please implement specific parser logic per agent.")
-    return json.dumps({"children": []}, indent=2)
+    results = []
+    for file in os.listdir(directory_path):
+        if file.endswith(".js") or file.endswith(".ts"):
+            file_path = os.path.join(directory_path, file)
+            try:
+                ast_output = subprocess.check_output([
+                    "node", "js/parseAst.js", file_path
+                ])
+                ast_data = json.loads(ast_output)
+                results.append({
+                    "filename": file,
+                    "filepath": file_path,
+                    "ast": ast_data.get("ast"),
+                    "customCommands": ast_data.get("customCommands", [])
+                })
+            except Exception as e:
+                print(f"❌ Error parsing {file}: {str(e)}")
+    return results
