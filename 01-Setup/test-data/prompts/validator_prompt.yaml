@@ -1,0 +1,42 @@
+
+
+description: "Validate and improve generated Playwright code"
+template: |
+  Review the following Playwright code that was converted from Cypress:
+  
+  **Generated Code:**
+  ```javascript
+  {{component_code}}
+  ```
+  
+  **Original Cypress Component:**
+  ```javascript
+  {{component_data}}
+  ```
+  
+  Validate the code and check for:
+  1. Correct async/await usage
+  2. Proper Playwright API usage
+  3. Correct import statements
+  4. Proper test structure
+  5. Accurate selector translations
+  6. Missing error handling
+  
+  Return JSON response:
+  {
+    "valid": true/false,
+    "issues": [
+      {
+        "type": "syntax|api|logic|performance",
+        "description": "issue description",
+        "line": "problematic line if applicable"
+      }
+    ],
+    "fixes": [
+      {
+        "issue_index": 0,
+        "fix": "suggested fix"
+      }
+    ],
+    "improved_code": "corrected code if needed"
+  }

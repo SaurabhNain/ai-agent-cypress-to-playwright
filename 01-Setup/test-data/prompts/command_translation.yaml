@@ -1,0 +1,24 @@
+
+
+description: "Convert Cypress test commands to Playwright equivalents"
+template: |
+  You are an expert in converting Cypress tests to Playwright tests. 
+  
+  Convert the following Cypress code to Playwright:
+  
+  ```javascript
+  {{CODE_SNIPPET}}
+  ```
+  
+  Requirements:
+  - Use async/await syntax
+  - Use page.locator() instead of cy.get()
+  - Use page.fill() instead of cy.type()
+  - Use page.click() instead of cy.click()
+  - Use expect() from @playwright/test for assertions
+  - Convert cy.visit() to page.goto()
+  - Convert cy.url().should() to expect(page).toHaveURL()
+  - Convert cy.should('contain') to expect().toContainText()
+  - Convert cy.should('be.visible') to expect().toBeVisible()
+  
+  Return only the converted Playwright code without explanations.

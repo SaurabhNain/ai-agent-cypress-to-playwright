@@ -1,0 +1,36 @@
+
+
+description: "Analyze Cypress test structure and extract components"
+template: |
+  Analyze the following Cypress test code and extract its structure:
+  
+  ```javascript
+  {{input_code}}
+  ```
+  
+  Extract and return JSON with:
+  1. **components**: Array of test components (describe blocks, it blocks, commands)
+  2. **layout**: Test file structure and hierarchy
+  3. **style_guide**: Coding patterns and conventions used
+  
+  Return ONLY valid JSON in this format:
+  {
+    "components": [
+      {
+        "type": "describe_block|it_block|command",
+        "name": "component name",
+        "content": "code content",
+        "dependencies": ["list of dependencies"]
+      }
+    ],
+    "layout": {
+      "structure": "hierarchical|flat",
+      "nesting_level": 0,
+      "test_organization": "by_feature|by_page|mixed"
+    },
+    "style_guide": {
+      "selector_strategy": "data_cy|css|xpath",
+      "assertion_style": "should|expect",
+      "async_pattern": "cypress_commands|custom_commands"
+    }
+  }

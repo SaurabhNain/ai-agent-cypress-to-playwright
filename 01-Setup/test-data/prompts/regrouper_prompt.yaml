@@ -1,0 +1,27 @@
+
+description: "Combine validated components into complete Playwright test file"
+template: |
+  Combine the following validated Playwright components into a complete, runnable test file:
+  
+  **Validated Components:**
+  {{validated_components}}
+  
+  **Layout Information:**
+  {{layout_info}}
+  
+  **Style Guide:**
+  {{style_guide}}
+  
+  Create a complete Playwright test file that:
+  1. Has proper imports at the top
+  2. Maintains the original test structure and hierarchy
+  3. Uses consistent naming conventions
+  4. Follows Playwright best practices
+  5. Is properly formatted and readable
+  6. Includes necessary setup/teardown if needed
+  
+  Return ONLY the complete Playwright test file code with no additional text:
+  
+  ```javascript
+  // Complete Playwright test file here
+  ```
