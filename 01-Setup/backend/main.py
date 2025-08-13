@@ -146,3 +146,72 @@ async def health_check():
 @app.get("/")
 async def root():
     return {"message": "Cypress to Playwright Conversion API", "version": "1.0.0"}
+
+
+@app.get("/agent/status")
+async def get_agent_status(pipeline = Depends(get_pipeline)):
+    if hasattr(pipeline, 'get_agent_status'):
+        return pipeline.get_agent_status()
+    return {"status": "basic_converter", "capabilities": ["conversion"]}
+
+@app.post("/agent/feedback")
+async def provide_feedback(
+    feedback: Dict[str, Any], 
+    pipeline = Depends(get_pipeline)
+):
+    input_hash = feedback.get("input_hash")
+    score = feedback.get("score", 3)
+    
+    if hasattr(pipeline, 'provide_feedback'):
+        pipeline.provide_feedback(input_hash, score)
+        return {"status": "feedback_received"}
+    
+    return {"status": "feedback_not_supported"}
+
+@app.post("/convert")
+async def convert_code(request: ConversionRequest, pipeline = Depends(get_pipeline)):
+    try:
+        start = time.time()
+        logger.info("Starting agentic conversion pipeline...")
+
+        result = pipeline(request.input_code)
+
+        # Enhanced response with agent metadata
+        response_data = {
+            "converted_code": result.code,
+            "success": result.success,
+            "confidence": result.confidence,
+            "strategy_used": result.strategy_used.value,
+            "components": format_components(result.components),
+            "metadata": {
+                **result.metadata,
+                "duration_seconds": time.time() - start,
+                "agent_capabilities": pipeline.get_agent_status()
+            }
+        }
+
+        return ConversionResponse(**response_data)
+
+    except Exception as e:
+        logger.error(f"Agentic conversion failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+# New endpoint for agent status
+@app.get("/agent/status")
+async def get_agent_status(pipeline = Depends(get_pipeline)):
+    return pipeline.get_agent_status()
+
+# New endpoint for providing feedback
+@app.post("/agent/feedback")
+async def provide_feedback(
+    feedback: Dict[str, Any], 
+    pipeline = Depends(get_pipeline)
+):
+    input_hash = feedback.get("input_hash")
+    score = feedback.get("score")  # 1-5 scale
+    
+    if hasattr(pipeline, 'provide_feedback'):
+        pipeline.provide_feedback(input_hash, score)
+        return {"status": "feedback_received"}
+    
+    return {"status": "feedback_not_supported"}   

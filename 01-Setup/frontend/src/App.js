@@ -1,5 +1,5 @@
 // App.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 function App() {
@@ -7,6 +7,7 @@ function App() {
   const [status, setStatus] = useState('');
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [agentStatus, setAgentStatus] = useState(null);
 
   // Sample Cypress code for demo
   const sampleCode = `describe('Login Tests', () => {
@@ -33,6 +34,20 @@ function App() {
     cy.get('.error-message').should('contain', 'Invalid credentials');
   });
 });`;
+
+  // Fetch agent status on component mount
+  useEffect(() => {
+    const fetchAgentStatus = async () => {
+      try {
+        const response = await axios.get('http://localhost:8000/agent/status');
+        setAgentStatus(response.data);
+      } catch (err) {
+        console.error('Failed to fetch agent status:', err);
+      }
+    };
+    
+    fetchAgentStatus();
+  }, []);
 
   const loadSampleCode = () => {
     setInputCode(sampleCode);
@@ -76,6 +91,19 @@ function App() {
     }
   };
 
+  // Add feedback mechanism
+  const provideFeedback = async (inputHash, score) => {
+    try {
+      await axios.post('http://localhost:8000/agent/feedback', {
+        input_hash: inputHash,
+        score: score
+      });
+      alert('Thank you for your feedback!');
+    } catch (err) {
+      console.error('Failed to provide feedback:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -115,14 +143,13 @@ function App() {
             </div>
             
             <textarea
-              className="w-full max-w-3xl p-4 font-mono text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              style={{ height: '600px' }}  // Adjust height to a reasonable value
+              className="w-full p-4 font-mono text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              style={{ height: '600px' }}
               value={inputCode}
               onChange={(e) => setInputCode(e.target.value)}
               placeholder="Enter your Cypress test code here...\n\nOr click 'Load Sample' to try with example code.\nLeave empty to use default sample."
               spellCheck={false}
             />
-
             
             <div className="mt-4 flex items-center justify-between">
               <div className="text-sm text-gray-500">
@@ -183,9 +210,46 @@ function App() {
             {result ? (
               <div className="space-y-4">
                 <div className="relative">
-                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm h-[768px] overflow-y-auto">
+                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm h-[600px] overflow-y-auto">
                     <code>{result.converted_code}</code>
                   </pre>
+                </div>
+
+                {/* Agent Performance */}
+                {(result.strategy_used || result.confidence || result.metadata?.tools_used) && (
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-blue-900 mb-2">🤖 Agent Performance</h3>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-blue-700">Strategy:</span>
+                        <span className="ml-2 font-medium">{result.strategy_used || 'simple'}</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700">Confidence:</span>
+                        <span className="ml-2 font-medium">{((result.confidence || 0.8) * 100).toFixed(1)}%</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700">Tools Used:</span>
+                        <span className="ml-2 font-medium">{result.metadata?.tools_used || 1}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Feedback Section */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold mb-2">Rate this conversion:</h3>
+                  <div className="flex space-x-2">
+                    {[1, 2, 3, 4, 5].map(score => (
+                      <button
+                        key={score}
+                        onClick={() => provideFeedback(result.metadata?.input_hash, score)}
+                        className="px-3 py-1 bg-yellow-200 hover:bg-yellow-300 rounded text-sm transition-colors"
+                      >
+                        ⭐ {score}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Component Details */}
@@ -256,7 +320,7 @@ function App() {
                 )}
               </div>
             ) : (
-              <div className="h-[768px] flex items-center justify-center text-gray-500 bg-gray-50 rounded-lg">
+              <div className="h-[600px] flex items-center justify-center text-gray-500 bg-gray-50 rounded-lg">
                 <div className="text-center">
                   <div className="text-4xl mb-2">⚡</div>
                   <p>Converted Playwright code will appear here</p>
@@ -266,6 +330,48 @@ function App() {
             )}
           </div>
         </div>
+
+        {/* Agent Status Display (if available) */}
+        {agentStatus && (
+          <div className="mt-8 bg-white rounded-lg shadow-sm border p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+              <span>🤖</span>
+              <span>Agent Status</span>
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Type:</span>
+                <span className="ml-2 font-medium">{agentStatus.agent_type || 'simple'}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Conversions:</span>
+                <span className="ml-2 font-medium">{agentStatus.total_conversions || 0}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Success Rate:</span>
+                <span className="ml-2 font-medium">
+                  {((agentStatus.performance?.success_rate || 0) * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-600">Tools:</span>
+                <span className="ml-2 font-medium">{agentStatus.tools?.available_tools || 0}</span>
+              </div>
+            </div>
+            {agentStatus.capabilities && (
+              <div className="mt-3">
+                <span className="text-gray-600">Capabilities:</span>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {agentStatus.capabilities.map((capability, idx) => (
+                    <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                      {capability.replace('_', ' ')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="mt-12 text-center text-gray-500 text-sm">

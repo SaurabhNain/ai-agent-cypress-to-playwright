@@ -145,23 +145,40 @@ class CypressToPlaywrightAgent:
 # ────────────────────────────────────────────────────────────────
 # Setup Function
 # ────────────────────────────────────────────────────────────────
+# Replace your current setup_dspy_pipeline() with:
 def setup_dspy_pipeline():
-    """Initialize the conversion pipeline"""
+    """Initialize the conversion pipeline - CHOOSE YOUR LEVEL"""
     try:
-        # Load environment variables
         from dotenv import load_dotenv
         load_dotenv()
         
-        # Check if GROQ_API_KEY is available
         groq_key = os.getenv("GROQ_API_KEY")
         if not groq_key:
             raise ValueError("GROQ_API_KEY not found in environment variables")
         
         print(f"✅ Found GROQ_API_KEY: {groq_key[:10]}...")
         
-        # Use the simple converter for reliable conversion
-        converter = SimpleConverter()
-        print("🔧 Using SimpleConverter for reliable conversion")
+        # CHOOSE YOUR LEVEL (uncomment one):
+        
+        # LEVEL 1: Simple Converter (Current - WORKING)
+        # converter = SimpleConverter()
+        
+        # LEVEL 2: Basic Agentic (Decision Making)
+        from .agentic_core import setup_agentic_pipeline
+        converter = setup_agentic_pipeline()
+        
+        # LEVEL 3: Enhanced Agentic (Tool Selection)  
+        # from .tool_system import setup_enhanced_agentic_pipeline
+        # converter = setup_enhanced_agentic_pipeline()
+        
+        # LEVEL 4: Learning Agentic (Memory & Learning)
+        # from .learning_system import setup_learning_agentic_pipeline
+        # converter = setup_learning_agentic_pipeline()
+        
+        # LEVEL 5: Fully Agentic (Self-Reflection & Autonomy)
+        # from .reflection_system import setup_fully_agentic_pipeline
+        # converter = setup_fully_agentic_pipeline()
+        
         return converter
         
     except Exception as e:

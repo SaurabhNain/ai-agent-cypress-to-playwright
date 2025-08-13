@@ -1,0 +1,86 @@
+# DriveWorks to React component conversion examples
+textbox_example: |
+  // DriveWorks TextBox
+  <TextBox Name="LengthInput" Text="10" Width="200" />
+  // React Conversion
+  const TextBox = styled.input`
+    font-size: ${props => props.theme?.fonts?.size || '11.25pt'};
+    border: ${props => `1px solid ${props.theme?.colors?.Gray || '#ccc'}`};
+    text-align: center;
+    height: 25px;
+    width: ${props => props.width || '100px'};
+  `;
+  const [length, setLength] = useState("10");
+  const handleLengthChange = (e) => {
+    setLength(e.target.value);
+  };
+  return (
+    <TextBox
+      type="text"
+      value={length}
+      onChange={handleLengthChange}
+      width="200px"
+    />
+  );
+
+combobox_example: |
+  // DriveWorks ComboBox
+  <ComboBox Name="DiameterSelector" Width="200">
+  <Items>
+  <Item>1/4 inch</Item>
+  <Item>3/8 inch</Item>
+  <Item>1/2 inch</Item>
+  <Item>3/4 inch</Item>
+  </Items>
+  <SelectedItem>1/2 inch</SelectedItem>
+  </ComboBox>
+  // React Conversion
+  const Select = styled.select`
+    font-size: ${props => props.theme?.fonts?.size || '11.25pt'};
+    height: 30px;
+    width: ${props => props.width || '200px'};
+    padding: 0 10px;
+    border: 1px solid ${props => props.theme?.colors?.Gray || '#ccc'};
+  `;
+  const options = ["1/4 inch", "3/8 inch", "1/2 inch", "3/4 inch"];
+  const [diameter, setDiameter] = useState("1/2 inch");
+  const handleDiameterChange = (e) => {
+    setDiameter(e.target.value);
+  };
+  return (
+    <Select value={diameter} onChange={handleDiameterChange} width="200px">
+      {options.map(option => (
+        <option key={option} value={option}>{option}</option>
+      ))}
+    </Select>
+  );
+
+validation_example: |
+  // Common validation issues for theme access
+  // Bad pattern - no optional chaining or fallbacks
+  const Component = styled.div`
+    color: ${props => props.theme.colors.primary};
+    font-size: ${props => props.theme.fonts.size};
+  `;
+  // Good pattern - with optional chaining and fallbacks
+  const Component = styled.div`
+    color: ${props => props.theme?.colors?.primary || '#005ca9'};
+    font-size: ${props => props.theme?.fonts?.size || '11.25pt'};
+  `;
+
+# Metadata for examples
+metadata:
+  textbox:
+    component_type: "TextBox"
+    conversion_type: "full"
+    properties_list: "Name,Text,Width"
+  
+  combobox:
+    component_type: "ComboBox"
+    conversion_type: "full"
+    properties_list: "Name,Width,Items,SelectedItem"
+  
+  validation:
+    type: "validation_pattern"
+    issue: "theme_access"
+    importance: "high"
